@@ -173,6 +173,7 @@ DWORD WINAPI ReadThread(LPVOID p)
 		if ((bSuccess == FALSE) || (dwRead == 0)) break;
 		strTemp.Format(_T("%d %d "), szInput.x, szInput.y);
 		g_mListBox->AddString(strTemp);
+		Sleep(500);
 
 	}
 	// 4. 뒷정리 
@@ -207,9 +208,10 @@ DWORD WINAPI ListenThread(LPVOID p)
 		// 3. 서비스 진행(통신)
 		if (bConnect == TRUE)
 		{
-			CreateThread(NULL, 0, ReadThread, hPipe, 0, NULL);
+			CloseHandle(CreateThread(NULL, 0, ReadThread, hPipe, 0, NULL));
 		}
 	}
+	CloseHandle(hPipe); // 추가 22-01-24
 	return 0;
 }
 

@@ -12,7 +12,6 @@
 #define new DEBUG_NEW
 #endif
 
-
 // 응용 프로그램 정보에 사용되는 CAboutDlg 대화 상자입니다.
 
 class CAboutDlg : public CDialogEx
@@ -47,8 +46,6 @@ END_MESSAGE_MAP()
 
 
 // CMyDroneAppDlg 대화 상자
-
-
 
 CMyDroneAppDlg::CMyDroneAppDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_MYDRONEAPP_DIALOG, pParent)
@@ -170,14 +167,12 @@ MyData g_array[100];
 int nIndex;
 int nCount;
 
-HANDLE g_hCalc;
-HANDLE g_hWrite;
-
-DWORD WINAPI WriteThread(LPVOID p)
+// 곱하기 2 수행 + 파일쓰는 마당쇠
+DWORD WINAPI CalcThread(LPVOID p)
 {
-
 	HANDLE hPipe;
 
+	// 파이프 만들기 
 	for (;;)
 	{
 		if (WaitNamedPipe(_T("\\\\.\\pipe\\ValueofXY"), NMPWAIT_WAIT_FOREVER) == TRUE)
@@ -190,32 +185,7 @@ DWORD WINAPI WriteThread(LPVOID p)
 		}
 	}
 
-	// 서비스 요청 
-
-	DWORD dwRead, dwWritten;
-	BOOL bSuccess;
-	CString strTemp2;
-	MyData* arWork = (MyData*)p;
-
-	for (int i = 0;i<100;i++)
-	{
-		strTemp2.Format(_T("x=%d, y=%d\n"), arWork[i].x, arWork[i].y);
-		bSuccess = WriteFile(hPipe, &arWork[i],
-			8, &dwWritten, NULL);
-
-		if ((bSuccess == FALSE) || (dwWritten == 0))
-		{
-			break;
-		}
-	}
-	return 0;
-}
-
-
-
-DWORD WINAPI CalcThread(LPVOID p)
-{
-	// 곱하기 2 수행하는 쓰레드 
+	// 곱하기 2 수행 + 파일 쓰기 
 	MyData* arWork = (MyData*)p;
 	for (;;)
 	{
@@ -223,11 +193,32 @@ DWORD WINAPI CalcThread(LPVOID p)
 		arWork[nIndex].x = arWork[nIndex].x * 2;
 		arWork[nIndex].y = arWork[nIndex].y * 2;
 
-		g_hWrite = CreateThread(NULL, 0, WriteThread, arWork, 0, 0);
+		// 서비스 요청 
 
+		DWORD dwWritten;
+		BOOL bSuccess;
+		CString strTemp2;
+		MyData* arWork = (MyData*)p;
+
+		for (int i = 0; i < 100; i++)
+		{
+			strTemp2.Format(_T("x=%d, y=%d\n"), arWork[i].x, arWork[i].y);
+			bSuccess = WriteFile(hPipe, &arWork[i],
+				8, &dwWritten, NULL);
+
+			if ((bSuccess == FALSE) || (dwWritten == 0))
+			{
+				break;
+			}
+		}
+		// 할당한 메모리 해제 
+		free(arWork);
 	}
+	CloseHandle(hPipe);
 	return 0;
 }
+
+
 
 DWORD WINAPI MonitorThread(LPVOID p)
 {
@@ -241,7 +232,7 @@ DWORD WINAPI MonitorThread(LPVOID p)
 
 	for (;;)
 	{
-		Sleep(100);
+		Sleep(200);
 
 		if (::GetMyDevPosition(&x, &y))
 		{
@@ -267,6 +258,8 @@ DWORD WINAPI MonitorThread(LPVOID p)
 			DWORD ID;
 			// 제어할 의사가 없다.
 			CloseHandle(CreateThread(NULL, 0, CalcThread, arCopy, 0, &ID));
+
+			// pArCopy = arCopy;
 			// nCount 초기화 
 			nIndex = 0;
 		}
@@ -275,6 +268,7 @@ DWORD WINAPI MonitorThread(LPVOID p)
 }
 
 HANDLE g_hMonitoring;
+
 void CMyDroneAppDlg::OnBnClickedButton1()	// start 
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
@@ -308,4 +302,5 @@ void CMyDroneAppDlg::OnBnClickedButton3()	// end
 	ReleaseMyDev();
 	TerminateThread(g_hMonitoring, 0);
 	CloseHandle(g_hMonitoring);
+	
 }
